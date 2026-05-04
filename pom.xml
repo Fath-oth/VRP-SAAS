@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- ── Identity ─────────────────────────────────────────── -->
+  <groupId>ma.vrp</groupId>
+  <artifactId>vrp-saas-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>VRP SaaS :: Parent</name>
+
+  <!-- ── Modules ───────────────────────────────────────────── -->
+  <modules>
+    <module>shared-lib</module>
+    <module>services/orders-service</module>
+    <module>services/fleet-service</module>
+    <module>services/tracking-service</module>
+    <module>services/api-gateway</module>
+  </modules>
+
+  <!-- ── Inherit from Spring Boot BOM ─────────────────────── -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.2</version>
+    <relativePath/>
+  </parent>
+
+  <!-- ── Centralised version pins ─────────────────────────── -->
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
+
+    <!-- Spring ecosystem -->
+    <spring-cloud.version>2023.0.3</spring-cloud.version>
+
+    <!-- Security -->
+    <keycloak.version>25.0.1</keycloak.version>
+    <oauth2-resource-server.version>6.3.1</oauth2-resource-server.version>
+
+    <!-- Persistence -->
+    <flyway.version>10.15.0</flyway.version>
+
+    <!-- Mapping / utils -->
+    <mapstruct.version>1.5.5.Final</mapstruct.version>
+    <lombok.version>1.18.34</lombok.version>
+
+    <!-- Testing -->
+    <testcontainers.version>1.20.1</testcontainers.version>
+
+    <!-- OWASP SCA plugin -->
+    <owasp.dependency-check.version>10.0.3</owasp.dependency-check.version>
+
+    <!-- Image naming for GHCR -->
+    <docker.image.prefix>ghcr.io/${env.GITHUB_REPOSITORY_OWNER}</docker.image.prefix>
+  </properties>
+
+  <!-- ── Dependency Management (BOM) ──────────────────────── -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring Cloud -->
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Testcontainers BOM -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Internal shared library -->
+      <dependency>
+        <groupId>ma.vrp</groupId>
+        <artifactId>shared-lib</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- Keycloak adapter -->
+      <dependency>
+        <groupId>org.keycloak</groupId>
+        <artifactId>keycloak-spring-boot-starter</artifactId>
+        <version>${keycloak.version}</version>
+      </dependency>
+
+      <!-- MapStruct -->
+      <dependency>
+        <groupId>org.mapstruct</groupId>
+        <artifactId>mapstruct</artifactId>
+        <version>${mapstruct.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!-- ── Common deps for ALL child modules ─────────────────── -->
+  <dependencies>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!-- ── Plugin Management ─────────────────────────────────── -->
+  <build>
+    <pluginManagement>
+      <plugins>
+        <!-- Spring Boot repackage (only activated in service modules) -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <configuration>
+            <excludes>
+              <exclude>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+              </exclude>
+            </excludes>
+          </configuration>
+        </plugin>
+
+        <!-- Build & push OCI images via Buildpacks (no Dockerfile needed for Java) -->
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <configuration>
+            <image>
+              <name>${docker.image.prefix}/${project.artifactId}:${project.version}</name>
+            </image>
+          </configuration>
+        </plugin>
+
+        <!-- OWASP SCA – run with: mvn verify -Psecurity -->
+        <plugin>
+          <groupId>org.owasp</groupId>
+          <artifactId>dependency-check-maven</artifactId>
+          <version>${owasp.dependency-check.version}</version>
+          <configuration>
+            <failBuildOnCVSS>7</failBuildOnCVSS>
+            <suppressionFile>owasp-suppressions.xml</suppressionFile>
+          </configuration>
+        </plugin>
+
+        <!-- Flyway for DB migrations -->
+        <plugin>
+          <groupId>org.flywaydb</groupId>
+          <artifactId>flyway-maven-plugin</artifactId>
+          <version>${flyway.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+</project>
