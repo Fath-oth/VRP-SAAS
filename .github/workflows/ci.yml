@@ -65,33 +65,33 @@ jobs:
           path: "**/target/surefire-reports/*.xml"
 
   # ── Job 2: Build Docker images ──────────────────────────────
-  docker-build:
-    name: Docker Build (dry-run)
-    runs-on: ubuntu-latest
-    needs: build
-    strategy:
-      matrix:
-        service:
-          - services/orders-service
-          - services/fleet-service
-          - services/tracking-service
-          - services/api-gateway
-          - optimization-engine
+  # docker-build:
+  #   name: Docker Build (dry-run)
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   strategy:
+  #     matrix:
+  #       service:
+  #         - services/orders-service
+  #         - services/fleet-service
+  #         - services/tracking-service
+  #         - services/api-gateway
+  #         - optimization-engine
 
-    steps:
-      - uses: actions/checkout@v4
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Build image (no push on PR)
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.service }}
-          push: false           # push only in release.yml
-          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  #     - name: Build image (no push on PR)
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ${{ matrix.service }}
+  #         push: false           # push only in release.yml
+  #         tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:ci
+  #         cache-from: type=gha
+  #         cache-to: type=gha,mode=max
 
   # ── Job 3: CodeQL SAST ──────────────────────────────────────
   codeql:
