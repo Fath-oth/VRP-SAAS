@@ -14,11 +14,11 @@
 
   <!-- ── Modules ───────────────────────────────────────────── -->
   <modules>
-    <module>shared-lib</module>
+    <!-- <module>shared-lib</module>
     <module>services/orders-service</module>
     <module>services/fleet-service</module>
     <module>services/tracking-service</module>
-    <module>services/api-gateway</module>
+    <module>services/api-gateway</module> -->
   </modules>
 
   <!-- ── Inherit from Spring Boot BOM ─────────────────────── -->
