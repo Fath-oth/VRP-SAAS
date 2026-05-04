@@ -1,0 +1,129 @@
+version: "3.9"
+
+# ── Re-usable health check ───────────────────────────────────
+x-healthcheck-pg: &hc-pg
+  test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vrp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: vrpdb
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck: *hc-pg
+    networks: [vrp-net]
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+    networks: [vrp-net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.1
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/vrpdb
+      KC_DB_USERNAME: vrp
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import
+    ports:
+      - "9090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [vrp-net]
+
+  # ── Optimization engine (Python/FastAPI) ────────────────────
+  optimization-engine:
+    build: ./optimization-engine
+    environment:
+      LOG_LEVEL: INFO
+    ports:
+      - "8090:8090"
+    networks: [vrp-net]
+
+  # ── Spring Boot microservices ───────────────────────────────
+  orders-service:
+    build: ./services/orders-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vrpdb
+      SPRING_DATASOURCE_USERNAME: vrp
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: >
+        http://keycloak:8080/realms/vrp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks: [vrp-net]
+
+  fleet-service:
+    build: ./services/fleet-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vrpdb
+      SPRING_DATASOURCE_USERNAME: vrp
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      OPTIMIZER_BASE_URL: http://optimization-engine:8090
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: >
+        http://keycloak:8080/realms/vrp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      optimization-engine:
+        condition: service_started
+    networks: [vrp-net]
+
+  tracking-service:
+    build: ./services/tracking-service
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: >
+        http://keycloak:8080/realms/vrp
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks: [vrp-net]
+
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8080:8080"    # ← single entry point for all clients
+    environment:
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://orders-service:8080
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://fleet-service:8080
+      SPRING_CLOUD_GATEWAY_ROUTES_2_URI: http://tracking-service:8080
+      KEYCLOAK_URL: http://keycloak:8080
+    depends_on:
+      - orders-service
+      - fleet-service
+      - tracking-service
+    networks: [vrp-net]
+
+# ── Volumes & Networks ──────────────────────────────────────
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  vrp-net:
+    driver: bridge
