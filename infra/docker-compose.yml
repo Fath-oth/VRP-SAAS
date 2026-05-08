@@ -8,8 +8,7 @@ x-healthcheck-pg: &hc-pg
   retries: 5
 
 services:
-
-  # ── Infrastructure ──────────────────────────────────────────
+  # ── Infrastructure (Standard Official Images) ────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -51,18 +50,19 @@ services:
         condition: service_healthy
     networks: [vrp-net]
 
-  # ── Optimization engine (Python/FastAPI) ────────────────────
+  # ── Team-Built Services (Pulling from GHCR) ──────────────────
+  # Replace 'fath-oth' with your actual GitHub username/org
+  
   optimization-engine:
-    build: ./optimization-engine
+    image: ghcr.io/fath-oth/vrp-saas/optimization-engine:latest
     environment:
       LOG_LEVEL: INFO
     ports:
       - "8090:8090"
     networks: [vrp-net]
 
-  # ── Spring Boot microservices ───────────────────────────────
   orders-service:
-    build: ./services/orders-service
+    image: ghcr.io/fath-oth/vrp-saas/orders-service:latest
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vrpdb
       SPRING_DATASOURCE_USERNAME: vrp
@@ -77,7 +77,7 @@ services:
     networks: [vrp-net]
 
   fleet-service:
-    build: ./services/fleet-service
+    image: ghcr.io/fath-oth/vrp-saas/fleet-service:latest
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vrpdb
       SPRING_DATASOURCE_USERNAME: vrp
@@ -93,7 +93,7 @@ services:
     networks: [vrp-net]
 
   tracking-service:
-    build: ./services/tracking-service
+    image: ghcr.io/fath-oth/vrp-saas/tracking-service:latest
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -105,9 +105,9 @@ services:
     networks: [vrp-net]
 
   api-gateway:
-    build: ./services/api-gateway
+    image: ghcr.io/fath-oth/vrp-saas/api-gateway:latest
     ports:
-      - "8080:8080"    # ← single entry point for all clients
+      - "8080:8080"
     environment:
       SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://orders-service:8080
       SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://fleet-service:8080
